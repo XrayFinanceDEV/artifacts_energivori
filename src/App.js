@@ -7,7 +7,6 @@ const EnergivoriSearchTool = () => {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
-  const [debugInfo, setDebugInfo] = useState('');
 
   // Funzione per formattare codici fiscali e partite IVA
   const formatFiscalCode = (value) => {
@@ -23,7 +22,6 @@ const EnergivoriSearchTool = () => {
     const loadData = async () => {
       try {
         console.log('🔍 Inizio caricamento dati...');
-        setDebugInfo('Caricamento dati...');
         
         const response = await fetch('/Energivori2025_ottimizzato_compact.json');
         console.log('📨 Response ricevuta:', {
@@ -66,13 +64,11 @@ const EnergivoriSearchTool = () => {
         console.log('🎯 Dati finali processati:', cleanData.length, 'aziende');
         console.log('🏆 Primi 3 elementi finali:', cleanData.slice(0, 3));
         
-        setDebugInfo(`✅ Successo: ${cleanData.length} aziende caricate`);
         setCompanies(cleanData);
         setIsLoading(false);
         
       } catch (error) {
         console.error('❌ ERRORE nel caricamento:', error);
-        setDebugInfo(`❌ Errore: ${error.message}`);
         setIsLoading(false);
         setCompanies([]);
       }
