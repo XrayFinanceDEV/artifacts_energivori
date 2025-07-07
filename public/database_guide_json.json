@@ -1,0 +1,247 @@
+{
+  "version": "1.0",
+  "database": "organisations",
+  "total_companies": 644000,
+  "total_sectors": 42,
+  "updated": "2025-01-07",
+  
+  "query_patterns": {
+    "single_company_search": {
+      "keywords": ["cerca", "trova", "informazioni", "dati", "scheda"],
+      "description": "Ricerca singola azienda per nome o codice fiscale",
+      "templates": [
+        {
+          "user_query": "cerca azienda Stellantis",
+          "sql": "SELECT company_complete_name, company_short_name, cf, iva, sector, dimension, revenue_n, employees_n, address_municipality, address_region, website, ceo_name FROM organisations WHERE LOWER(company_complete_name) LIKE LOWER('%stellantis%') OR LOWER(company_short_name) LIKE LOWER('%stellantis%') ORDER BY revenue_n DESC LIMIT 1",
+          "notes": "Per ricerca singola usa sempre LIKE con % per flessibilità"
+        },
+        {
+          "user_query": "dati azienda con CF 12345678901",
+          "sql": "SELECT * FROM organisations WHERE cf = '12345678901'",
+          "notes": "Per CF usa = esatto, non LIKE"
+        }
+      ]
+    },
+
+    "sector_analysis": {
+      "keywords": ["settore", "industria", "confronto settori", "benchmark", "comparazione"],
+      "description": "Analisi per settore economico con 42 settori disponibili",
+      "sector_mapping": {
+        "informatica": "Software",
+        "tech": "Software", 
+        "it": "Software",
+        "manifatturiere": "Metalmeccanico",
+        "produzione": "Macchinari",
+        "immobiliari": "Real Estate",
+        "turistiche": "Turismo e Ristorazione",
+        "hotel": "Turismo e Ristorazione",
+        "commerciali": "Commercio",
+        "retail": "Commercio",
+        "consulenza": "Altre consulenze",
+        "automotive": "Automotive",
+        "bancarie": "Financial Services",
+        "finanziarie": "Financial Services"
+      },
+      "top_sectors": {
+        "Real Estate": "180798 aziende",
+        "Commercio": "98727 aziende", 
+        "Financial Services": "55137 aziende",
+        "Turismo e Ristorazione": "40296 aziende",
+        "Software": "27058 aziende",
+        "Metalmeccanico": "22043 aziende"
+      },
+      "templates": [
+        {
+          "user_query": "aziende del settore software",
+          "sql": "SELECT company_complete_name, revenue_n, employees_n, dimension, address_municipality FROM organisations WHERE LOWER(sector) = LOWER('Software') AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "Usa sempre LOWER() per settori, ordina per fatturato"
+        },
+        {
+          "user_query": "confronto settori per fatturato medio",
+          "sql": "SELECT sector, COUNT(*) as numero_aziende, ROUND(AVG(revenue_n)) as fatturato_medio_k_euro, ROUND(AVG(employees_n)) as dipendenti_medi FROM organisations WHERE sector IS NOT NULL AND revenue_n IS NOT NULL GROUP BY sector ORDER BY fatturato_medio_k_euro DESC",
+          "notes": "Gruppi per settore con statistiche aggregate"
+        },
+        {
+          "user_query": "top 20 aziende informatiche",
+          "sql": "SELECT company_complete_name, revenue_n, employees_n, address_municipality, website FROM organisations WHERE LOWER(sector) = LOWER('Software') AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "Software = 27k aziende disponibili"
+        }
+      ]
+    },
+
+    "geographic_analysis": {
+      "keywords": ["regione", "provincia", "città", "territorio", "zona", "milano", "roma", "lombardia"],
+      "description": "Ricerche geografiche con priorità: comune > provincia > regione",
+      "geographic_priority": "Se utente dice 'Milano' → municipality, se dice 'provincia di Milano' → province",
+      "major_cities": ["Milano", "Roma", "Napoli", "Torino", "Bologna", "Firenze", "Brescia", "Venezia"],
+      "major_regions": ["Lombardia", "Lazio", "Campania", "Piemonte", "Veneto", "Toscana", "Emilia-Romagna"],
+      "templates": [
+        {
+          "user_query": "aziende di Milano",
+          "sql": "SELECT company_complete_name, sector, revenue_n, employees_n, dimension FROM organisations WHERE LOWER(address_municipality) LIKE LOWER('%milano%') AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "Milano = municipality, non province"
+        },
+        {
+          "user_query": "grandi aziende lombarde",
+          "sql": "SELECT company_complete_name, sector, revenue_n, address_municipality FROM organisations WHERE LOWER(address_region) LIKE LOWER('%lombardia%') AND dimension = 'grande' AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "Lombardia = region, grandi = dimension filter"
+        },
+        {
+          "user_query": "top aziende per regione",
+          "sql": "SELECT address_region, company_complete_name, revenue_n, sector FROM organisations WHERE address_region IS NOT NULL AND revenue_n IS NOT NULL ORDER BY address_region, revenue_n DESC",
+          "notes": "Raggruppa per regione, ordina per fatturato within region"
+        }
+      ]
+    },
+
+    "financial_analysis": {
+      "keywords": ["crescita", "trend", "performance", "redditività", "margini", "fatturato", "utile", "crisi"],
+      "description": "Analisi finanziarie avanzate con dati storici",
+      "financial_fields_k_euro": ["revenue_n", "revenue_n_1", "revenue_n_2", "ebitda", "result", "totassets", "pn", "pfn"],
+      "templates": [
+        {
+          "user_query": "aziende con crescita fatturato",
+          "sql": "SELECT company_complete_name, revenue_n_2 as fatturato_2021, revenue_n_1 as fatturato_2022, revenue_n as fatturato_2023, ((revenue_n - revenue_n_1) / NULLIF(revenue_n_1, 0) * 100) as crescita_percentuale, sector, employees_n FROM organisations WHERE revenue_n IS NOT NULL AND revenue_n_1 IS NOT NULL AND revenue_n_1 > 0 ORDER BY crescita_percentuale DESC LIMIT 20",
+          "notes": "Calcola crescita % tra n-1 e n, usa NULLIF per evitare divisione per zero"
+        },
+        {
+          "user_query": "aziende più redditizie",
+          "sql": "SELECT company_complete_name, revenue_n, ebitda, (ebitda/NULLIF(revenue_n,0)*100) as margine_ebitda_percent, result, sector FROM organisations WHERE ebitda IS NOT NULL AND revenue_n > 0 ORDER BY margine_ebitda_percent DESC LIMIT 20",
+          "notes": "Margine EBITDA = (EBITDA/Fatturato)*100"
+        },
+        {
+          "user_query": "aziende in difficoltà finanziarie",
+          "sql": "SELECT company_complete_name, revenue_n, result, pfn, sector, dimension, address_region FROM organisations WHERE pfn < 0 AND result < 0 AND revenue_n IS NOT NULL ORDER BY result ASC LIMIT 20",
+          "notes": "PFN negativa + risultato negativo = difficoltà"
+        },
+        {
+          "user_query": "trend fatturato settore automotive",
+          "sql": "SELECT company_complete_name, revenue_n_2, revenue_n_1, revenue_n, ((revenue_n - revenue_n_2) / NULLIF(revenue_n_2, 0) * 100) as crescita_biennale FROM organisations WHERE LOWER(sector) = LOWER('Automotive') AND revenue_n IS NOT NULL AND revenue_n_2 IS NOT NULL ORDER BY crescita_biennale DESC LIMIT 15",
+          "notes": "Crescita su 2 anni per trend più significativo"
+        }
+      ]
+    },
+
+    "size_dimension_analysis": {
+      "keywords": ["grandi", "piccole", "micro", "medie", "dimensione", "maggiori", "top"],
+      "description": "Analisi per dimensione aziendale",
+      "dimensions": ["micro", "piccola", "media", "grande"],
+      "templates": [
+        {
+          "user_query": "grandi aziende italiane",
+          "sql": "SELECT company_complete_name, revenue_n, employees_n, sector, address_region FROM organisations WHERE dimension = 'grande' AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "dimension = 'grande' per filtro specifico"
+        },
+        {
+          "user_query": "piccole aziende innovative",
+          "sql": "SELECT company_complete_name, revenue_n, employees_n, sector, address_municipality FROM organisations WHERE dimension = 'piccola' AND LOWER(sector) IN ('software', 'ricerca e sviluppo', 'elettronica apparechiature') ORDER BY revenue_n DESC LIMIT 20",
+          "notes": "Piccole + settori innovativi"
+        }
+      ]
+    },
+
+    "employee_analysis": {
+      "keywords": ["dipendenti", "occupazione", "personale", "workforce", "assunzioni"],
+      "description": "Analisi organico e crescita occupazionale",
+      "templates": [
+        {
+          "user_query": "aziende con più dipendenti",
+          "sql": "SELECT company_complete_name, employees_n, employees_n_1, (employees_n - employees_n_1) as crescita_dipendenti, sector, revenue_n FROM organisations WHERE employees_n IS NOT NULL ORDER BY employees_n DESC LIMIT 20",
+          "notes": "Ordina per numero dipendenti, mostra anche crescita"
+        },
+        {
+          "user_query": "crescita occupazionale settore tech",
+          "sql": "SELECT company_complete_name, employees_n_1 as dipendenti_2022, employees_n as dipendenti_2023, ((employees_n - employees_n_1) / NULLIF(employees_n_1, 0) * 100) as crescita_occupazionale_percent FROM organisations WHERE LOWER(sector) = LOWER('Software') AND employees_n IS NOT NULL AND employees_n_1 IS NOT NULL ORDER BY crescita_occupazionale_percent DESC LIMIT 15",
+          "notes": "% crescita dipendenti = indicatore di espansione"
+        }
+      ]
+    },
+
+    "combined_filters": {
+      "keywords": ["informatiche milanesi", "manifatturiere lombarde", "hotel toscani", "grandi commerciali"],
+      "description": "Query complesse con filtri multipli combinati",
+      "templates": [
+        {
+          "user_query": "grandi aziende informatiche di Milano",
+          "sql": "SELECT company_complete_name, revenue_n, employees_n, website, address_street FROM organisations WHERE LOWER(sector) = LOWER('Software') AND LOWER(address_municipality) LIKE LOWER('%milano%') AND dimension IN ('media', 'grande') AND revenue_n IS NOT NULL ORDER BY revenue_n DESC LIMIT 15",
+          "notes": "Combina settore + geografia + dimensione"
+        },
+        {
+          "user_query": "piccole manifatturiere lombarde in crescita",
+          "sql": "SELECT company_complete_name, revenue_n_1, revenue_n, ((revenue_n - revenue_n_1) / NULLIF(revenue_n_1, 0) * 100) as crescita, employees_n, address_municipality FROM organisations WHERE LOWER(sector) = LOWER('Metalmeccanico') AND LOWER(address_region) LIKE LOWER('%lombardia%') AND dimension = 'piccola' AND revenue_n > revenue_n_1 AND revenue_n_1 > 0 ORDER BY crescita DESC LIMIT 20",
+          "notes": "Settore + regione + dimensione + crescita positiva"
+        },
+        {
+          "user_query": "hotel toscani redditizi",
+          "sql": "SELECT company_complete_name, revenue_n, ebitda, (ebitda/NULLIF(revenue_n,0)*100) as margine, address_municipality, website FROM organisations WHERE LOWER(sector) = LOWER('Turismo e Ristorazione') AND LOWER(address_region) LIKE LOWER('%toscana%') AND ebitda > 0 AND revenue_n > 0 ORDER BY margine DESC LIMIT 15",
+          "notes": "Settore turistico + regione + redditività"
+        }
+      ]
+    }
+  },
+
+  "database_schema": {
+    "key_fields": {
+      "identifiers": ["id", "company_complete_name", "company_short_name", "cf", "iva"],
+      "financial_k_euro": ["revenue_n", "revenue_n_1", "revenue_n_2", "ebitda", "result", "totassets", "pn", "pfn"],
+      "organization": ["employees_n", "employees_n_1", "dimension", "sector", "group_nr_companies"],
+      "geographic": ["address_municipality", "address_province", "address_region", "prov_code"],
+      "business": ["ateco_code", "ateco_description", "ceo_name", "company_profile", "website"],
+      "dates": ["closing_year", "closing_date", "created_at", "updated_at"]
+    },
+    "important_notes": {
+      "financial_values": "Tutti i valori finanziari sono in MIGLIAIA di Euro (k€)",
+      "search_syntax": "Usa sempre LOWER() e LIKE '%xxx%' per ricerche flessibili",
+      "null_handling": "Controlla sempre IS NOT NULL per campi numerici importanti",
+      "order_by": "Default: ORDER BY revenue_n DESC per liste aziende",
+      "limit": "Sempre LIMIT 20 per performance ottimali"
+    }
+  },
+
+  "sector_intelligence": {
+    "sector_synonyms": {
+      "informatica": "Software", "tech": "Software", "it": "Software",
+      "manifatturiere": "Metalmeccanico", "produzione": "Macchinari",
+      "immobiliari": "Real Estate", "costruzioni": "Real Estate",
+      "turistiche": "Turismo e Ristorazione", "hotel": "Turismo e Ristorazione",
+      "commerciali": "Commercio", "retail": "Commercio",
+      "bancarie": "Financial Services", "finanza": "Financial Services",
+      "automotive": "Automotive", "auto": "Automotive",
+      "consulenza": "Altre consulenze", "advisory": "Altre consulenze"
+    },
+    "all_sectors": [
+      "Real Estate", "Commercio", "Financial Services", "Turismo e Ristorazione",
+      "Software", "Metalmeccanico", "Trasporti e Logistica", "Servizi alle Persone",
+      "Manutenzione", "Servizi alle Imprese", "Altre consulenze", "Macchinari",
+      "Cultura e Sport", "Tessile e calzature", "Utility", "Agricoltura",
+      "Ingegneria", "Agroalimentare", "Elettronica Apparechiature", "Servizi",
+      "Marketing", "Editoria", "Noleggio", "Gomma Plastica", "Legno Carta Cartone",
+      "Beni di consumo", "Mobili", "Vetro Ceramica", "Settore Pubblico",
+      "Ricerca e Sviluppo", "Chimica", "Stampa", "Metallurgia", "Formazione",
+      "Automotive", "Estrazione MP", "Telecomunicazioni", "Altri veicoli",
+      "Farmaceutica", "Petrolchimico"
+    ]
+  },
+
+  "query_optimization": {
+    "performance_tips": [
+      "Sempre WHERE published_at IS NOT NULL",
+      "Usa LIMIT 20 di default",
+      "ORDER BY revenue_n DESC NULLS LAST",
+      "Per range numerici: field >= X AND field <= Y",
+      "ILIKE per case-insensitive ma più lento di LOWER() = LOWER()"
+    ],
+    "common_mistakes": [
+      "Non usare DESCRIBE (non supportato)",
+      "Ricorda che valori finanziari sono in k€",
+      "Non dimenticare NULLIF per divisioni",
+      "Sempre % in LIKE per substring match"
+    ]
+  },
+
+  "ai_prompt_suggestions": {
+    "context_building": "Se query complessa, aggiungi: 'Database con 644k aziende italiane, 42 settori. Valori finanziari in migliaia €.'",
+    "result_formatting": "Sempre specificare unità (k€ per valori finanziari, # per dipendenti)",
+    "error_handling": "Se query fallisce, suggerisci settori alternativi o filtri meno restrittivi"
+  }
+}
